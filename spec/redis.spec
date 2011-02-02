@@ -1,7 +1,10 @@
 %define pid_dir %{_localstatedir}/run/redis
 %define pid_file %{pid_dir}/redis.pid
 %define redis_ver 2.0.4
-%define redis_rel 1
+%define redis_rel abd_01
+
+%define abd_dir /abd/app/redis
+%define log_dir /abd/logs/redis
 
 Summary: redis is a key-value database like memcached
 Name: redis
@@ -49,19 +52,44 @@ and so on. Redis is free software released under the very liberal BSD license.
 %install
 %{__rm} -rf %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
-%{__install} -Dp -m 0755 redis-server %{buildroot}%{_sbindir}/redis-server
+%{__install} -Dp -m 0755 redis-server    %{buildroot}%{_sbindir}/redis-server
 %{__install} -Dp -m 0755 redis-benchmark %{buildroot}%{_bindir}/redis-benchmark
-%{__install} -Dp -m 0755 redis-cli %{buildroot}%{_bindir}/redis-cli
+%{__install} -Dp -m 0755 redis-cli       %{buildroot}%{_bindir}/redis-cli
 
-%{__install} -Dp -m 0755 %{SOURCE3} %{buildroot}%{_sysconfdir}/logrotate.d/redis
-%{__install} -Dp -m 0755 %{SOURCE2} %{buildroot}%{_sysconfdir}/init.d/redis
-%{__install} -Dp -m 0644 redis.conf %{buildroot}%{_sysconfdir}/redis.conf
-%{__install} -p -d -m 0755 %{buildroot}%{_localstatedir}/lib/redis
-%{__install} -p -d -m 0755 %{buildroot}%{_localstatedir}/log/redis
-%{__install} -p -d -m 0755 %{buildroot}%{pid_dir}
+%{__install} -Dp   -m 0755 %{SOURCE3} %{buildroot}%{_sysconfdir}/logrotate.d/redis
+%{__install} -Dp   -m 0755 %{SOURCE2} %{buildroot}%{_sysconfdir}/init.d/redis
+%{__install} -Dp   -m 0644 redis.conf %{buildroot}%{_sysconfdir}/redis.conf
+%{__install} -p -d -m 0755            %{buildroot}%{_localstatedir}/lib/redis
+%{__install} -p -d -m 0755            %{buildroot}%{_localstatedir}/log/redis
+%{__install} -p -d -m 0755            %{buildroot}%{pid_dir}
+
+mkdir -p %{buildroot}%{abd_dir}
+mkdir -p %{buildroot}%{log_dir}
+%{__install} -p -d -m 0775 -g infra   %{buildroot}%{abd_dir}
+%{__install} -p -d -m 0775 -g infra   %{buildroot}%{log_dir}
 
 %pre
-/usr/sbin/useradd -c 'Redis' -u 499 -s /bin/false -r -d %{_localstatedir}/lib/redis redis 2> /dev/null || :
+echo "Creating user: redis"
+/usr/sbin/userdel redis                                                                           2> /dev/null || :
+/usr/sbin/useradd -c 'Redis' -u 499 -s /sbin/nologin -r -m -d %{_localstatedir}/empty/redis redis 2> /dev/null || :
+/bin/rm -rf %{_localstatedir}/empty/redis/*                                                       2> /dev/null || :
+
+echo "Creating dir: %{abd_dir}"
+if [ ! -d %{abd_dir} ]
+then
+    mkdir -p             %{abd_dir}/db
+    chown -R redis:infra %{abd_dir}
+    chmod -R 0775        %{abd_dir}
+fi
+
+echo "Creating dir: %{log_dir}"
+if [ ! -d %{log_dir} ]
+then
+    mkdir -p             %{log_dir}
+    chown -R redis:infra %{log_dir}
+    chmod -R 0775        %{log_dir}
+fi
+
 
 %preun
 if [ $1 = 0 ]; then
